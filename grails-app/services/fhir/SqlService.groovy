@@ -48,6 +48,10 @@ def generator = { String alphabet, int n ->
     return ret
   }
 
+  def query(sqlQuery) {
+    return sql.rows(sqlQuery)
+  }
+
 
   ResourceVersion getLatestByFhirId(String fhir_type, fhir_id) {
     return ResourceVersion.find("from ResourceVersion as v where v.fhir_type=? and v.fhir_id=? order by v.version_id desc", [fhir_type, fhir_id])

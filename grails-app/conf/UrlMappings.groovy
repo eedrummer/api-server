@@ -26,6 +26,11 @@ class UrlMappings {
       action=[GET: "summary"]
     }
 
+    name instaCount: "/filter" {
+      controller="Filter"
+      action=[POST: "instaCount"]
+    }
+
     name resourceInstance: "/$resource/$id" {
       controller="Api"
       action=[GET: "read", PUT: "update", DELETE: "delete"]
