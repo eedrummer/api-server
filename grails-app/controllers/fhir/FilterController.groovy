@@ -1,7 +1,6 @@
 package fhir
 
 import javax.sql.DataSource
-import groovy.json.JsonSlurper
 
 class WhereClause {
   String searchParam
@@ -23,32 +22,32 @@ class FilterController {
   def instaCount() {
     def patientWhere = []
     def conditionWhere = []
-    def slurper = new JsonSlurper()
-    def filter = slurper.parseText(request.reader.text)
-    filter.parameter.each { param ->
-      switch(param.url) {
-        case "http://interventionengine.org/patientgender":
-          patientWhere << new WhereClause(searchParam: "gender", column: "token_code", comparator: "=", value: param.valueString)
+    def group = request.reader.text.decodeFhirJson()
+    group.characteristic.each { characteristic ->
+      switch(characteristic.code.coding) {
+        case {it.any { c -> c.system == "http://loinc.org" && c.code == "21840-4"}}: // Patient Gender
+          def firstValueCode = characteristic.valueCodeableConcept.coding[0]
+          patientWhere << new WhereClause(searchParam: "gender", column: "token_code", comparator: "=", value: firstValueCode.code)
         break
-        case "http://interventionengine.org/patientage":
-          if (param.valueRange) {
-            if (param.valueRange.high) {
-              def ageInYears = param.valueRange.high.value.toInteger();
+        case {it.any { c -> c.system == "http://loinc.org" && c.code == "21612-7"}}: // Patient Age
+          if (characteristic.valueRange) {
+            if (characteristic.valueRange.high) {
+              def ageInYears = characteristic.valueRange.high.value.toInteger();
               def d = new Date();
               d[Calendar.YEAR] = (d[Calendar.YEAR] - ageInYears)
               patientWhere << new WhereClause(searchParam: "birthdate", column: "date_max", comparator: ">", value: d.format("YYYY-MM-dd"))
             }
-            if (param.valueRange.low) {
-              def ageInYears = param.valueRange.low.value.toInteger()
+            if (characteristic.valueRange.low) {
+              def ageInYears = characteristic.valueRange.low.value.toInteger()
               def d = new Date()
               d[Calendar.YEAR] = d[Calendar.YEAR] - ageInYears
               patientWhere << new WhereClause(searchParam: "birthdate", column: "date_max", comparator: "<", value: d.format("YYYY-MM-dd"))
             }
           }
         break
-        case "http://interventionengine.org/conditioncode":
-          conditionWhere << new WhereClause(searchParam: "code", column: "token_code", comparator: "=", value: param.valueCodeableConcept.coding[0].code,
-                                            system: param.valueCodeableConcept.coding[0].system)
+        case {it.any { c -> c.system == "http://loinc.org" && c.code == "11450-4"}}:
+          conditionWhere << new WhereClause(searchParam: "code", column: "token_code", comparator: "=", value: characteristic.valueCodeableConcept.coding[0].code,
+                                            system: characteristic.valueCodeableConcept.coding[0].system)
         break
       }
     }
@@ -72,7 +71,6 @@ class FilterController {
             where fhir_type = 'Condition'  AND search_param = 'patient'  AND reference_id = p.fhir_id)
     """
     }.join("\nAND\n"))
-
     def response = sqlService.query(query.toString()).collect {i -> i.fhir_id}
     render response
   }
